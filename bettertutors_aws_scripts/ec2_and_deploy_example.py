@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 # Scavenged from one of my old assignments :P
 
 from functools import partial
@@ -25,7 +27,7 @@ def first_run(root='$HOME/rest-api'):
 # TODO: Set this all up in a virtualenv
 # TODO: Deploy to a proper directory (e.g.: /wwwroot)
 
-def deploy(root='$HOME/rest-api'):
+def deploy(root='$HOME/rest-api', daemon='bettertutorsd'):
     if not exists('"{root}"'.format(root=root), use_sudo=True):
         return first_run(root)
     with cd('"{root}"'.format(root=root)):
@@ -33,7 +35,7 @@ def deploy(root='$HOME/rest-api'):
 
     with cd('/etc/init'):
         fabric_env.sudo_user = 'root'
-        daemon = 'bettertutorsd'
+
         sudo('> {name}.conf'.format(name=daemon))
         sudo('chmod 700 {name}.conf'.format(name=daemon))
         sudo('''cat << EOF >> {name}.conf
@@ -49,12 +51,11 @@ EOF
         sudo('initctl reload-configuration')
 
 
-def serve(root='$HOME/rest-api'):
+def serve(root='$HOME/rest-api', daemon='bettertutorsd'):
     if not exists('"{root}"'.format(root=root)):
         raise OSError('Folder: "{root}" doesn\'t exists but should'.format(root=root))
 
     fabric_env.sudo_user = 'root'
-    daemon = 'bettertutorsd'
     sudo('stop {name}'.format(name=daemon), warn_only=True)
     sudo('start {name}'.format(name=daemon))  # Restart is less reliable, especially if it's in a stopped state
 
@@ -72,5 +73,3 @@ if __name__ == '__main__':
         run3 = partial(ec2.run2, host=ec2.public_dns_name)
         print run3(deploy)
         print run3(serve)
-
-        # TODO: Extract this out and simplify so it's easier for others to follow

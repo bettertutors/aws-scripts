@@ -6,3 +6,4 @@ Some deployment and monitoring scripts for deploying bettertutors to Amazon Web 
 There are a few environment variables to setup:
 
     SSH_KEY_FILENAME
+    AWS_NIX_USERNAME
