@@ -44,7 +44,7 @@ def install_requirements(root):
 def upgrade_packages():
     sudo('apt-get update -qq')
     sudo('apt-get -y --force-yes upgrade')
-    sudo('apt-get -y --force-yes dist-upgrade')
+    # sudo('apt-get -y --force-yes dist-upgrade')
     # ^Definitely don't leave this line in for regular (non AMI creation) use!
 
     # IRL you'll want to setup a base AMI image and upgrade it frequently, then push along your new application
@@ -58,12 +58,11 @@ def first_run(root='$HOME/rest-api'):
 
     sudo('apt-get update -qq')
     upgrade_packages()  # Leave this commented out for regular use
-    sudo('apt-get install -q -y --force-yes python-pip python-virtualenv libpq-dev git')
+    sudo('apt-get install -q -y --force-yes libpython2.7-dev python-pip python-virtualenv libpq-dev git')
     # libpq-dev is for the Postgres driver, could do python-psycopg2, but that's not as isolated as a virtualenv.
     sudo('git clone https://github.com/bettertutors/rest-api', user='ubuntu')
     _create_virtualenv('"$HOME"')
-
-    install_requirements(root)
+    setup_ports()
 
 
 # TODO: Set this all up in a virtualenv
@@ -81,18 +80,30 @@ def deploy(root='$HOME/rest-api', daemon='bettertutorsd'):
         fabric_env.sudo_user = 'root'
 
         sudo('> {name}.conf'.format(name=daemon))
-        sudo('chmod 700 {name}.conf'.format(name=daemon))
+        sudo('chmod 644 {name}.conf'.format(name=daemon))
         sudo('''cat << EOF >> {name}.conf
-start on runlevel [2345]
+description "bettertutorsd"
+
+start on (filesystem)
 stop on runlevel [016]
 
 respawn
 setuid nobody
 setgid nogroup
-exec "$HOME/.venv/bin/python" "{root}/bettertutors_rest_api.py"
+chdir "{root}"
+exec "$HOME/.venv/bin/gunicorn" -w 4 "bettertutors_rest_api:rest_api" -b 0.0.0.0
 EOF
             '''.format(name=daemon, root=root))
         sudo('initctl reload-configuration')
+
+
+def setup_ports():
+    sudo('iptables -A INPUT -p tcp --dport ssh -j ACCEPT', user='root')
+    sudo('iptables -A INPUT -p tcp --dport 80 -j ACCEPT', user='root')
+    sudo('iptables -A INPUT -p tcp --dport 8000 -j ACCEPT', user='root')
+    # Handled ^ by AWS firewall stuff, but in general I don't want to rely on them for when I go multicloud approach.
+    sudo('iptables -A PREROUTING -t nat -p tcp --dport 80 -j REDIRECT --to-port 8000', user='root')
+    # Make permanent with iptables-persistent package
 
 
 def serve(root='$HOME/rest-api', daemon='bettertutorsd'):
