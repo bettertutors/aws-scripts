@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 from sys import stderr
+from os import path, makedirs
 from random import randint
 from inspect import getargspec
 from functools import partial
@@ -21,9 +22,10 @@ class EC2Wrapper(object):
     instance = None
     image_id = None
 
-    def __init__(self, ami_image_id, name='', random_rename=False, persist=False):
+    def __init__(self, ami_image_id, name='', key_name=None, random_rename=False, persist=False):
         self.ami_image_id = ami_image_id
         self.instance_name = name
+        self.key_name = key_name
         if random_rename:  # To handle 'You must wait 60 seconds after deleting a instance' error
             self.instance_name += str(randint(1, 100))
         self.conn = self.configure()
@@ -71,7 +73,7 @@ class EC2Wrapper(object):
         print 'image_id =', self.ami_image_id
         print 'security_groups =', [security_group]
         return self.conn.run_instances(image_id=self.ami_image_id, instance_type=instance_type,
-                                       placement=placement,
+                                       placement=placement, key_name=self.key_name,
                                        security_groups=[security_group], monitoring_enabled=True)
 
     def get_instances(self):
@@ -97,6 +99,22 @@ class EC2Wrapper(object):
             return []
         return self.conn.stop_instances(self.instance.id)  # Stop, don't delete (for now)
         # self.conn.terminate_instances(self.instance.id)
+
+    def create_key_pair(self, name, save_to):
+        """ Generates key/pair, puts .pem in place of your choosing, then returns that first result """
+        key_pair = self.conn.create_key_pair(name)
+        directory = path.dirname(save_to)
+        if not path.exists(directory):
+            makedirs(directory)
+        with open(save_to, 'w') as f:
+            f.write(key_pair.material)
+        return key_pair
+
+    def get_key_pair(self, name):
+        return self.conn.get_key_pair(name)
+
+    def delete_key_pair(self, name):
+        return self.conn.delete_key_pair(name)
 
     @staticmethod
     def run(inst, commands, username='ubuntu'):

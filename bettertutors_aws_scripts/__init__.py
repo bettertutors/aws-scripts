@@ -7,7 +7,7 @@ fabric_env.skip_bad_hosts = True
 fabric_env.user = environ.get('AWS_NIX_USERNAME', 'ubuntu')
 fabric_env.sudo_user = fabric_env.user
 fabric_env.key_filename = environ.get(
-    'SSH_KEY_FILENAME', path.expanduser(path.join(path.expanduser('~'), '.ssh', 'aws', 'private', 'cscie90.pem'))
+    'SSH_KEY_FILENAME', path.expanduser(path.join(path.expanduser('~'), '.ssh', 'bettertutors', 'private.pem'))
 )
 
 _creds_path = path.join(path.expanduser('~'), '.aws', 'credentials')

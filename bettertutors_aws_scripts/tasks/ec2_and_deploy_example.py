@@ -2,6 +2,7 @@
 
 # Scavenged from one of my old assignments :P
 
+from os import path
 from functools import partial
 from time import sleep
 from pprint import PrettyPrinter
@@ -76,14 +77,20 @@ def tail():
 if __name__ == '__main__':
     my_instance_name = 'bettertutors'
     ami_image_id = 'ami-e3eb9fd9'  # Ubuntu 14.04 LTS; Canonical release for Asia Pacific (Sydney) data-centre
+
     ec2 = EC2Wrapper(ami_image_id=ami_image_id)
+
+    key_pair = ec2.get_key_pair(my_instance_name) or ec2.create_key_pair(
+        my_instance_name, path.join(path.expanduser('~'), '.ssh', my_instance_name, 'private.pem')
+    )
+    ec2.key_name = key_pair.name
 
     run3 = partial(ec2.run2, host='ap-southeast-2.compute.amazonaws.com')
     print run3(deploy)
     print run3(serve)
 
     '''
-    with EC2Wrapper(ami_image_id=ami_image_id, persist=False) as ec2:
+    with EC2Wrapper(ami_image_id=ami_image_id, key_name=key_pair.name, persist=False) as ec2:
         creating = ec2.create_instance()
         print 'Creating:', creating, 'with instances:', creating.instances
         pp(dir(creating.instances[0]))

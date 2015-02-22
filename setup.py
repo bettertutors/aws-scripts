@@ -5,7 +5,7 @@ if __name__ == '__main__':
     setup(
         name=package_name,
         author='Samuel Marks',
-        version='0.4.0',
+        version='0.5.0',
         test_suite='test',
         packages=filter(lambda p: p != 'test', find_packages()),  # exclude='test' doesn't work
         package_data={package_name: ['logging.conf']},
