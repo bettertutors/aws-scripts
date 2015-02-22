@@ -5,13 +5,15 @@
 from os import path
 from functools import partial
 from time import sleep
+from contextlib import contextmanager
+
 from pprint import PrettyPrinter
 
 pp = PrettyPrinter(indent=4).pprint
 
 from fabric.context_managers import cd
 from fabric.contrib.files import exists
-from fabric.api import sudo
+from fabric.api import sudo, prefix, run
 
 from bettertutors_aws_scripts.wrappers.EC2Wrapper import EC2Wrapper
 
@@ -22,25 +24,47 @@ class TimeoutError(BaseException):
     pass
 
 
+@contextmanager
+def virtualenv():
+    # From: http://stackoverflow.com/a/5359988/587021
+    with cd('"$HOME/.venv"'):
+        with prefix('source "$HOME/.venv/bin/activate"'):
+            yield
+
+
+def _create_virtualenv(directory, name='.venv'):
+    with cd(directory):
+        sudo('virtualenv {name}'.format(name=name))
+
+
+def install_requirements(root):
+    with virtualenv():
+        run('pip install -r "{root}/requirements.txt"'.format(root=root))
+
+
 def first_run(root='$HOME/rest-api'):
     fabric_env.sudo_user = 'root'
     if exists('"{root}"'.format(root=root), use_sudo=True):
         return deploy(root)
 
-    sudo('apt-get update')
-    sudo('apt-get install -q -y --force-yes python-pip git')
+    sudo('apt-get update -qq')
+    sudo('apt-get install -q -y --force-yes python-pip python-virtualenv git')
     sudo('git clone https://github.com/bettertutors/rest-api', user='ubuntu')
-    sudo('pip install -r "{root}/requirements.txt"'.format(root=root))
+    _create_virtualenv('"$HOME"')
+
+    install_requirements(root)
 
 
 # TODO: Set this all up in a virtualenv
-# TODO: Deploy to a proper directory (e.g.: /wwwroot)
+# TODO: Deploy to a proper directory (e.g.: /wwwroot), with its own user
 
 def deploy(root='$HOME/rest-api', daemon='bettertutorsd'):
     if not exists('"{root}"'.format(root=root), use_sudo=True):
         return first_run(root)
+
     with cd('"{root}"'.format(root=root)):
         sudo('git pull', user='ubuntu')
+        install_requirements(root)
 
     with cd('/etc/init'):
         fabric_env.sudo_user = 'root'
@@ -54,7 +78,7 @@ stop on runlevel [016]
 respawn
 setuid nobody
 setgid nogroup
-exec python "{root}/bettertutors_rest_api.py"
+exec "$HOME/.venv/bin/python" "{root}/bettertutors_rest_api.py"
 EOF
             '''.format(name=daemon, root=root))
         sudo('initctl reload-configuration')
