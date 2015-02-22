@@ -27,19 +27,28 @@ class TimeoutError(BaseException):
 @contextmanager
 def virtualenv():
     # From: http://stackoverflow.com/a/5359988/587021
-    with cd('"$HOME/.venv"'):
-        with prefix('source "$HOME/.venv/bin/activate"'):
-            yield
+    with prefix('source "$HOME/.venv/bin/activate"'):
+        yield
 
 
 def _create_virtualenv(directory, name='.venv'):
     with cd(directory):
-        sudo('virtualenv {name}'.format(name=name))
+        sudo('virtualenv {name}'.format(name=name), user='ubuntu')
 
 
 def install_requirements(root):
     with virtualenv():
-        run('pip install -r "{root}/requirements.txt"'.format(root=root))
+        sudo('pip install -r "{root}/requirements.txt"'.format(root=root), user='ubuntu')
+
+
+def upgrade_packages():
+    sudo('apt-get update -qq')
+    sudo('apt-get -y --force-yes upgrade')
+    sudo('apt-get -y --force-yes dist-upgrade')
+    # ^Definitely don't leave this line in for regular (non AMI creation) use!
+
+    # IRL you'll want to setup a base AMI image and upgrade it frequently, then push along your new application
+    # Your DB is somewhere else, so there's no worries with turning on/off all your instances (gradually)
 
 
 def first_run(root='$HOME/rest-api'):
@@ -48,7 +57,9 @@ def first_run(root='$HOME/rest-api'):
         return deploy(root)
 
     sudo('apt-get update -qq')
-    sudo('apt-get install -q -y --force-yes python-pip python-virtualenv git')
+    upgrade_packages()  # Leave this commented out for regular use
+    sudo('apt-get install -q -y --force-yes python-pip python-virtualenv libpq-dev git')
+    # libpq-dev is for the Postgres driver, could do python-psycopg2, but that's not as isolated as a virtualenv.
     sudo('git clone https://github.com/bettertutors/rest-api', user='ubuntu')
     _create_virtualenv('"$HOME"')
 
