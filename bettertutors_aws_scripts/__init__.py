@@ -11,9 +11,8 @@ fabric_env.key_filename = environ.get(
 )
 
 _creds_path = path.join(path.expanduser('~'), '.aws', 'credentials')
-if path.exists(_creds_path):
-    aws_keys = {i[0].rstrip(): i[1].lstrip()
-                for i in tuple(e.rstrip('\n').split('=') for e in
-                               open(_creds_path).readlines()[1:])}
-else:
-    aws_keys = {k: environ[k] for k in 'AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY'}
+
+aws_keys = {i[0].rstrip(): i[1].lstrip() for i in
+            tuple(e.rstrip('\n').split('=') for e in open(_creds_path).readlines()[1:])} \
+    if path.exists(_creds_path) \
+    else {k: environ[k] for k in ('AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY')}

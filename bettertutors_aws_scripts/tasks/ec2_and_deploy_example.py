@@ -8,9 +8,9 @@ from fabric.context_managers import cd
 from fabric.contrib.files import exists
 from fabric.api import sudo
 
-from EC2Wrapper import EC2Wrapper
+from bettertutors_aws_scripts.wrappers.EC2Wrapper import EC2Wrapper
 
-from __init__ import fabric_env
+from bettertutors_aws_scripts import fabric_env
 
 
 def first_run(root='$HOME/rest-api'):

@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 
-from os.path import expanduser, join as path_join
 from sys import stderr
 from random import randint
 from inspect import getargspec
@@ -13,13 +12,12 @@ from boto.exception import EC2ResponseError
 
 from fabric.tasks import execute
 
-from ..__init__ import fabric_env
+from bettertutors_aws_scripts import fabric_env, aws_keys
 
 pp = PrettyPrinter(indent=4).pprint
 
 
 class EC2Wrapper(object):
-    aws_keys =
     instance = None
     image_id = None
 
@@ -48,7 +46,7 @@ class EC2Wrapper(object):
             self.delete()
 
     def configure(self, region='ap-southeast-2'):
-        self.conn = connect_to_region(region_name=region, **self.aws_keys)
+        self.conn = connect_to_region(region_name=region, **aws_keys)
         return self.conn  # Hmm, if only I could inherit a class from this connection
 
     def list_all_images(self, filters=None):
