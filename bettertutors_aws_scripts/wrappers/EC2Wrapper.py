@@ -27,11 +27,13 @@ class EC2Wrapper(object):
         if random_rename:  # To handle 'You must wait 60 seconds after deleting a instance' error
             self.instance_name += str(randint(1, 100))
         self.conn = self.configure()
+        '''
         tuple(setattr(self, method, partial(getattr(self, 'conn', method), image_id=self.image_id))
               for method in dir(self.conn)
               if not any((method.startswith('_'),
                           (lambda args: 'image_id' not in args[0]
                                         or 'kwargs' not in args[1:])(getargspec(getattr(self, 'conn', method))))))
+        '''
         self.persist = persist
 
     def __enter__(self):
@@ -63,12 +65,12 @@ class EC2Wrapper(object):
         self.image_id = self.conn.create_image(instance_id, name, description)
         return self.image_id
 
-    def create_instance(self, security_group='ssh_http_rdp', placement='ap-southeast-2'):
+    def create_instance(self, security_group='ssh_http', placement='ap-southeast-2a', instance_type='t1.micro'):
         if not self.ami_image_id:
             raise ValueError('self.ami_image_id must be set')
         print 'image_id =', self.ami_image_id
         print 'security_groups =', [security_group]
-        return self.conn.run_instances(image_id=self.ami_image_id, instance_type='t1.micro',
+        return self.conn.run_instances(image_id=self.ami_image_id, instance_type=instance_type,
                                        placement=placement,
                                        security_groups=[security_group], monitoring_enabled=True)
 

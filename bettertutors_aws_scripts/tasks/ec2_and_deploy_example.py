@@ -3,6 +3,10 @@
 # Scavenged from one of my old assignments :P
 
 from functools import partial
+from time import sleep
+from pprint import PrettyPrinter
+
+pp = PrettyPrinter(indent=4).pprint
 
 from fabric.context_managers import cd
 from fabric.contrib.files import exists
@@ -11,6 +15,10 @@ from fabric.api import sudo
 from bettertutors_aws_scripts.wrappers.EC2Wrapper import EC2Wrapper
 
 from bettertutors_aws_scripts import fabric_env
+
+
+class TimeoutError(BaseException):
+    pass
 
 
 def first_run(root='$HOME/rest-api'):
@@ -69,7 +77,21 @@ if __name__ == '__main__':
     my_instance_name = 'bettertutors'
     ami_image_id = 'ami-e3eb9fd9'  # Ubuntu 14.04 LTS; Canonical release for Asia Pacific (Sydney) data-centre
 
-    with EC2Wrapper(ami_image_id=ami_image_id, persist=True) as ec2:
-        run3 = partial(ec2.run2, host=ec2.public_dns_name)
-        print run3(deploy)
-        print run3(serve)
+    with EC2Wrapper(ami_image_id=ami_image_id, persist=False) as ec2:
+        for instance in ec2.create_instance().instances:
+            run3 = partial(ec2.run2, host=instance.public_dns_name)
+            instance.start()
+            tried = 0
+            previous_state = None
+            while instance.state != 'running':
+                if previous_state != instance.state:
+                    print 'instance.state is', instance.state
+                    print 'Waiting (up to) 2 minutes for instance to start...',
+                    previous_state = instance.state
+                elif tried > 60:
+                    raise TimeoutError
+                print '.',
+                sleep(2)
+                tried += 1
+            print run3(deploy)
+            print run3(serve)
