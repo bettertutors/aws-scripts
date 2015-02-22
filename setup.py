@@ -5,11 +5,12 @@ if __name__ == '__main__':
     setup(
         name=package_name,
         author='Samuel Marks',
-        version='0.1.1',
+        version='0.2.0',
         test_suite='test',
         packages=filter(lambda p: p != 'test', find_packages()),  # exclude='test' doesn't work
         package_data={package_name: ['logging.conf']},
         install_requires=[
-            'boto', 'fabric'
+            'boto3', 'fabric',
+            'boto'  # TODO: Remove this dependency
         ]
     )

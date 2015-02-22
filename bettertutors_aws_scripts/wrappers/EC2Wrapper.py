@@ -13,15 +13,13 @@ from boto.exception import EC2ResponseError
 
 from fabric.tasks import execute
 
-from __init__ import fabric_env
+from ..__init__ import fabric_env
 
 pp = PrettyPrinter(indent=4).pprint
 
 
 class EC2Wrapper(object):
-    aws_keys = {i[0].rstrip(): i[1].lstrip()
-                for i in tuple(e.rstrip('\n').split('=') for e in
-                               open(path_join(expanduser('~'), '.aws', 'credentials')).readlines()[1:])}
+    aws_keys =
     instance = None
     image_id = None
 
