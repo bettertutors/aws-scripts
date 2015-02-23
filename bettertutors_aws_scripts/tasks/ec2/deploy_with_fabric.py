@@ -77,27 +77,29 @@ def deploy(root='$HOME/rest-api', daemon='bettertutorsd'):
     with cd('"{root}"'.format(root=root)):
         sudo('git pull', user='ubuntu')
         install_requirements(root)
+    create_service(root, daemon)
 
-    with cd('/etc/init'):
-        fabric_env.sudo_user = 'root'
-        put(
-            **{
-                'local_path': StringIO(
-                    '''description "{daemon}"
 
-                    start on (filesystem)
-                    stop on runlevel [016]
+def create_service(root='$HOME/rest-api', daemon='bettertutorsd'):
+    fabric_env.sudo_user = 'root'
+    conf_file = '/etc/init/{name}.conf'.format(name=daemon)
+    put(
+        **{
+            'local_path': StringIO('''description "{daemon}"
+start on (filesystem)
+stop on runlevel [016]
 
-                    respawn
-                    setuid nobody
-                    setgid nogroup
-                    chdir "{root}"
-                    exec "$HOME/.venv/bin/gunicorn" -w 4 "bettertutors_rest_api:rest_api" -b 0.0.0.0
-                    '''.format(name=daemon, root=root)),
-                'remote_path': '{name}.conf'.format(name=daemon)
-            }
-        )
-        sudo('chmod 644 {name}.conf'.format(name=daemon))
+respawn
+setuid nobody
+setgid nogroup
+chdir "{root}"
+exec "$HOME/.venv/bin/gunicorn" -w 4 "bettertutors_rest_api:rest_api" -b 0.0.0.0'''.format(daemon=daemon, root=root)),
+            'remote_path': conf_file,
+            'mode': 0644,
+            'use_sudo': True
+        }
+    )
+    sudo('chown {user}:{user} {conf_file}'.format(user=fabric_env.sudo_user, conf_file=conf_file))
 
     sudo('initctl reload-configuration')
 
@@ -120,8 +122,7 @@ def serve(root='$HOME/rest-api', daemon='bettertutorsd'):
     sudo('start {name}'.format(name=daemon))  # Restart is less reliable, especially if it's in a stopped state
 
 
-def tail():
-    daemon = 'bettertutorsd'
+def tail(daemon='bettertutorsd'):
     return sudo('tail /var/log/upstart/{name}.log -n 50 -f'.format(name=daemon))
 
 
