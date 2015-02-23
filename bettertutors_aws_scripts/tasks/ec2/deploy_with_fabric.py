@@ -6,14 +6,16 @@ from os import path
 from functools import partial
 from time import sleep
 from contextlib import contextmanager
+from cStringIO import StringIO
 
 from pprint import PrettyPrinter
 
 pp = PrettyPrinter(indent=4).pprint
 
+from fabric.api import sudo, prefix, run
 from fabric.context_managers import cd
 from fabric.contrib.files import exists
-from fabric.api import sudo, prefix, run
+from fabric.operations import put
 
 from bettertutors_aws_scripts.wrappers.EC2Wrapper import EC2Wrapper
 
@@ -78,23 +80,26 @@ def deploy(root='$HOME/rest-api', daemon='bettertutorsd'):
 
     with cd('/etc/init'):
         fabric_env.sudo_user = 'root'
+        put(
+            **{
+                'local_path': StringIO(
+                    '''description "{daemon}"
 
-        sudo('> {name}.conf'.format(name=daemon))
+                    start on (filesystem)
+                    stop on runlevel [016]
+
+                    respawn
+                    setuid nobody
+                    setgid nogroup
+                    chdir "{root}"
+                    exec "$HOME/.venv/bin/gunicorn" -w 4 "bettertutors_rest_api:rest_api" -b 0.0.0.0
+                    '''.format(name=daemon, root=root)),
+                'remote_path': '{name}.conf'.format(name=daemon)
+            }
+        )
         sudo('chmod 644 {name}.conf'.format(name=daemon))
-        sudo('''cat << EOF >> {name}.conf
-description "bettertutorsd"
 
-start on (filesystem)
-stop on runlevel [016]
-
-respawn
-setuid nobody
-setgid nogroup
-chdir "{root}"
-exec "$HOME/.venv/bin/gunicorn" -w 4 "bettertutors_rest_api:rest_api" -b 0.0.0.0
-EOF
-            '''.format(name=daemon, root=root))
-        sudo('initctl reload-configuration')
+    sudo('initctl reload-configuration')
 
 
 def setup_ports():
