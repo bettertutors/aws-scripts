@@ -14,7 +14,7 @@ pp = PrettyPrinter(indent=4).pprint
 
 from fabric.api import sudo, prefix, run
 from fabric.context_managers import cd
-from fabric.contrib.files import exists
+from fabric.contrib.files import exists, append
 from fabric.operations import put
 
 from bettertutors_aws_scripts.wrappers.EC2Wrapper import EC2Wrapper
@@ -93,7 +93,9 @@ respawn
 setuid nobody
 setgid nogroup
 chdir "{root}"
-exec "$HOME/.venv/bin/gunicorn" -w 4 "bettertutors_rest_api:rest_api" -b 0.0.0.0'''.format(daemon=daemon, root=root)),
+exec "/home/ubuntu/.venv/bin/gunicorn" -w 4 "bettertutors_rest_api:rest_api" -b 0.0.0.0'''.format(
+                daemon=daemon,
+                root='/home/ubuntu/rest-api' or root)),  # TODO: Grab $HOME from script
             'remote_path': conf_file,
             'mode': 0644,
             'use_sudo': True
@@ -103,6 +105,22 @@ exec "$HOME/.venv/bin/gunicorn" -w 4 "bettertutors_rest_api:rest_api" -b 0.0.0.0
 
     sudo('initctl reload-configuration')
 
+# An attempt to use `start-stop-daemon`:
+'''description "{daemon}"
+
+start on runlevel [2345]
+stop on runlevel [!2345]
+
+respawn
+respawn limit 5 120
+
+limit nofile 64000 64000
+limit memlock unlimited unlimited
+
+env OPTS='-w 4 bettertutors_rest_api:rest_api -b 0.0.0.0'
+env DAEMON='/home/ubuntu/.venv/bin/gunicorn'
+exec start-stop-daemon --make-pidfile --pidfile $PID -S --exec $DAEMON -- "$OPTS" --start'''
+
 
 def setup_ports():
     sudo('iptables -A INPUT -p tcp --dport ssh -j ACCEPT', user='root')
@@ -111,6 +129,42 @@ def setup_ports():
     # Handled ^ by AWS firewall stuff, but in general I don't want to rely on them for when I go multicloud approach.
     sudo('iptables -A PREROUTING -t nat -p tcp --dport 80 -j REDIRECT --to-port 8000', user='root')
     # Make permanent with iptables-persistent package
+
+
+def install_nginx():
+    """ Installs latest stable nginx from official sources """
+    fabric_env.sudo_user = 'root'
+    sudo('wget -qO - http://nginx.org/keys/nginx_signing.key | apt-key add -')
+    append('/etc/apt/sources.list', '''deb http://nginx.org/packages/mainline/ubuntu/ {codename} nginx
+deb-src http://nginx.org/packages/mainline/ubuntu/ {codename} nginx'''.format(
+        codename=sudo('lsb_release --codename | cut -f2', quiet=True)
+    ), use_sudo=True)
+    sudo('apt-get update -qqq')
+    sudo('apt-get install -y nginx')
+
+
+def deploy_nginx():
+    fabric_env.sudo_user = 'root'
+    conf_file = '/etc/nginx/conf.d/bettertutors.conf'
+    if exists(conf_file, use_sudo=True):
+        sudo('rm {conf_file}'.format(conf_file=conf_file))
+    put(StringIO('''server {
+    listen       80;
+    server_name  localhost;
+
+    #access_log  /var/log/nginx/log/host.access.log  main;
+
+    location /api {
+        proxy_pass http://localhost:5555;
+    }
+}
+'''), conf_file, use_sudo=True)
+
+
+def serve_nginx():
+    # sudo('service nginx reload', user='root')
+    sudo('service nginx stop', user='root')
+    sudo('service nginx start', user='root')
 
 
 def serve(root='$HOME/rest-api', daemon='bettertutorsd'):
@@ -123,7 +177,7 @@ def serve(root='$HOME/rest-api', daemon='bettertutorsd'):
 
 
 def tail(daemon='bettertutorsd'):
-    return sudo('tail /var/log/upstart/{name}.log -n 50 -f'.format(name=daemon))
+    return sudo('tail /var/log/upstart/{name}.log -n 50 -f'.format(name=daemon), user='root')
 
 
 if __name__ == '__main__':
@@ -137,9 +191,15 @@ if __name__ == '__main__':
     )
     ec2.key_name = key_pair.name
 
-    run3 = partial(ec2.run2, host='ap-southeast-2.compute.amazonaws.com')
-    print run3(deploy)
-    print run3(serve)
+    run3 = partial(ec2.run2, host='ec2-52-64-9-210.ap-southeast-2.compute.amazonaws.com')
+    map(run3, (
+        # deploy,
+        # serve,
+        # install_nginx,
+        # deploy_nginx,
+        # serve_nginx,
+        tail,
+    ))
 
     '''
     with EC2Wrapper(ami_image_id=ami_image_id, key_name=key_pair.name, persist=False) as ec2:
